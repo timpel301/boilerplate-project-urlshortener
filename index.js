@@ -3,9 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 var bodyparser = require('body-parser');
-const dns = require('node:dns');
+const dns = require('dns');
 const mongoose = require('mongoose');
-const { nanoid } = require('nanoid');
+const shortid = require('shortid');
+const URL = require('url').URL;
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -33,15 +34,16 @@ urlSchema = new mongoose.Schema({
 });
 
 const Url = mongoose.model('Url', urlSchema);
+//const base_url = 'https://boilerplate-project-urlshortener.timpel301.repl.co'
 
-const createShort = (req, res) => {
-  var hostname = req.body.url;
-  var short = nanoid();
-  dns.lookup(hostname, (err) => {
+app.post('/api/shorturl', (req, res, nexr) => {
+  var inputUrl = req.body.url;
+  var hostname = new URL(req.body.url);
+  dns.lookup(hostname.hostname, (err, address, family) => {
     if (err) {
-      res.json({ error: 'Invalid URL' });
+      res.json({ error: 'invalid url' });
       return;
-    }
+    } else {
     Url.findOne({ original_url: hostname }).exec((err, url) => {
       if (err) {
         console.error(err);
@@ -52,23 +54,16 @@ const createShort = (req, res) => {
         res.json(url);
       } else {
         url = new Url({
-          original_url: hostname,
-          short_url: short,
+          original_url: inputUrl,
+          short_url: shortid.generate(),
         });
-        url.save((err) => {
-          if (err) {
-            console.error(err);
-            res.json({ error: 'not saved' });
-            return;
-          }
-          res.json(url);
-        });
+        url.save(url);
       }
-    });
-  });
-};
-
-app.route('/api/shorturl').post(createShort);
+      res.json(url);
+      });
+    }}
+  );
+});
 
 app.get('/api/shorturl/:short', (req, res) => {
   Url.findOne({ short_url: req.params.short }).exec((err, url) => {
